@@ -33,11 +33,23 @@ jobs:
         id: ngrok
         run: |
           nohup ngrok tcp 3389 --authtoken ${{ secrets.NGROK_AUTH_TOKEN }} > ngrok.log 2>&1 &
-          sleep 5
-          # Extract the public TCP address from ngrok logs
-          TCP_URL=$(grep -o 'tcp://[0-9a-z\.]*:[0-9]*' ngrok.log | head -n1)
+          echo "Waiting for ngrok to initialize..."
+          # Loop until TCP URL appears in log
+          TCP_URL=""
+          for i in {1..20}; do
+            TCP_URL=$(grep -o 'tcp://[0-9a-z\.]*:[0-9]*' ngrok.log | head -n1)
+            if [ ! -z "$TCP_URL" ]; then
+              break
+            fi
+            sleep 2
+          done
+          if [ -z "$TCP_URL" ]; then
+            echo "❌ Failed to get ngrok TCP URL"
+            exit 1
+          fi
           echo "Ngrok TCP forwarding URL: $TCP_URL"
           echo "TCP_URL=$TCP_URL" >> $GITHUB_ENV
+
 
       # Step 5: Print final instructions
       - name: Output connection info

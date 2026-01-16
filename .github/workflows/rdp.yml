@@ -1,16 +1,20 @@
 name: Start RDP
 
-# ← This is required: tells GitHub when to run the workflow
-on: 
-  workflow_dispatch:  # lets you trigger it manually
+# Trigger manually from the GitHub Actions tab
+on:
+  workflow_dispatch:
 
 jobs:
   start-rdp:
     runs-on: ubuntu-latest
     steps:
+      # Step 1: Install dependencies
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y xrdp xfce4 xfce4-terminal unzip
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xrdp xfce4 xfce4-terminal unzip curl
 
+      # Step 2: Install ngrok
       - name: Install ngrok
         run: |
           curl -sLo ngrok.zip https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-linux-amd64.zip
@@ -18,8 +22,30 @@ jobs:
           chmod +x ngrok
           sudo mv ngrok /usr/local/bin/
 
-      - name: Start xrdp
-        run: sudo service xrdp start
+      # Step 3: Set up a lightweight desktop environment
+      - name: Configure Xfce for xrdp
+        run: |
+          echo "startxfce4" > ~/.xsession
+          sudo service xrdp restart
 
+      # Step 4: Start ngrok TCP tunnel in background
       - name: Start ngrok
-        run: ngrok tcp 3389 --authtoken ${{ secrets.NGROK_AUTH_TOKEN }}
+        id: ngrok
+        run: |
+          nohup ngrok tcp 3389 --authtoken ${{ secrets.NGROK_AUTH_TOKEN }} > ngrok.log 2>&1 &
+          sleep 5
+          # Extract the public TCP address from ngrok logs
+          TCP_URL=$(grep -o 'tcp://[0-9a-z\.]*:[0-9]*' ngrok.log | head -n1)
+          echo "Ngrok TCP forwarding URL: $TCP_URL"
+          echo "TCP_URL=$TCP_URL" >> $GITHUB_ENV
+
+      # Step 5: Print final instructions
+      - name: Output connection info
+        run: |
+          echo "========================================="
+          echo "✅ RDP is ready!"
+          echo "Use this address in your RDP client (on your phone or PC):"
+          echo "$TCP_URL"
+          echo "Username: $(whoami)"
+          echo "Password: your GitHub runner password (default Ubuntu user has no password, may need to set one)"
+          echo "========================================="

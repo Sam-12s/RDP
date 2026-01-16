@@ -1,20 +1,25 @@
 name: Start RDP
 
-on:
-  workflow_dispatch:
+# ← This is required: tells GitHub when to run the workflow
+on: 
+  workflow_dispatch:  # lets you trigger it manually
 
 jobs:
   start-rdp:
     runs-on: ubuntu-latest
     steps:
-      - name: Install xrdp
-        run: sudo apt-get update && sudo apt-get install -y xrdp xfce4 xfce4-terminal
-      - name: Start RDP server
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y xrdp xfce4 xfce4-terminal unzip
+
+      - name: Install ngrok
         run: |
-          sudo service xrdp start
-      - name: Expose via ngrok
-        run: |
-          curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
-          echo "deb https://ngrok-agent.s3.amazonaws.com/apt stable main" | sudo tee /etc/apt/sources.list.d/ngrok.list
-          sudo apt update && sudo apt install ngrok
-          ngrok tcp 3389 --authtoken ${{ secrets.NGROK_AUTH_TOKEN }}
+          curl -sLo ngrok.zip https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-linux-amd64.zip
+          unzip ngrok.zip
+          chmod +x ngrok
+          sudo mv ngrok /usr/local/bin/
+
+      - name: Start xrdp
+        run: sudo service xrdp start
+
+      - name: Start ngrok
+        run: ngrok tcp 3389 --authtoken ${{ secrets.NGROK_AUTH_TOKEN }}
